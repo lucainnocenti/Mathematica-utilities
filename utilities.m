@@ -79,9 +79,9 @@ exportHere[name_,obj_]:=Export[FileNameJoin@{NotebookDirectory[],name},obj]
 
 texStyles=<|
 "plain"->Directive[Black,{FontFamily->"LM Roman 12",FontSize->24,FontWeight->Plain,FontSlant->Plain}],
-"writing"->texStyleWriting = Directive[Black,{FontFamily->"CMU Serif",FontSize->20,FontWeight->Plain,FontSlant->Plain}],
-"title"->texStyleTitle = Directive[Black,{FontFamily->"CMU Serif",FontSize->24,FontWeight->Plain,FontSlant->Plain}],
-"labels"->texStyleLabels=Directive[Black,{FontFamily->"LMMathItalic10",FontSize->24,FontWeight->Plain,FontSlant->Plain}]
+"writing"->Directive[Black,{FontFamily->"CMU Serif",FontSize->20,FontWeight->Plain,FontSlant->Plain}],
+"title"->Directive[Black,{FontFamily->"CMU Serif",FontSize->24,FontWeight->Plain,FontSlant->Plain}],
+"labels"->Directive[Black,{FontFamily->"LMMathItalic10",FontSize->24,FontWeight->Plain,FontSlant->Plain}]
 |>
 
 
