@@ -37,14 +37,17 @@ extractStyles::usage = "returns a tuple {\"all line style directives\", \"all pl
 autoLegend::usage = "Simplified legending for the plot passed as first argument, with legends given as second argument. Use the option Alignment -> {horizontal, vertical} to place the legend in the PlotRegion in scaled coordinates. For other options, see Options[legendMaker] which are used by autoLegend.";
 
 
-exportHere::usage = "exportHere[fileName,object] saves object in the current directory with the name fileName."
-absSquared::usage = "absSquared[z] returns the square of the absolute value of z."
-traceView2::usage = "traceView2[expr] returns a formatted view of the TraceScan of the expression."
-seeOptions::usage = "seeOptions[function] returns the list of options defined for function, without the clumsy whatever`private`stuff notation."
-factorInteger::usage = "factorInteger[n] returns the prime integer factorization of n, nicely formatted."
-dynamicPlot
-dynamicPlot2
-texStyles
+exportHere::usage = "exportHere[fileName,object] saves object in the current directory with the name fileName.";
+absSquared::usage = "absSquared[z] returns the square of the absolute value of z.";
+absArgForm::usage = "absArgForm[z] returns the complex number z in |z| Exp[I Arg[z]] form, with the argument always between 0 and Pi."
+traceView2::usage = "traceView2[expr] returns a formatted view of the TraceScan of the expression.";
+seeOptions::usage = "seeOptions[function] returns the list of options defined for function, without the clumsy whatever`private`stuff notation.";
+factorInteger::usage = "factorInteger[n] returns the prime integer factorization of n, nicely formatted.";
+dynamicPlot;
+dynamicPlot2;
+texStyles;
+
+MF::usage = "MF[arg] is just an alias for MatrixForm[arg].";
 
 
 dynamicallyHighlight::usage = "DynamicallyHighlight[tableToHighlight,equivalenceTest] prints a dynamic version of tableToHighlight where hovering with the mouse on the element elem1 highlights all elements elem2 of tableToHighlight such that equivalenceTest[elem1,elem2] is True.";
@@ -59,6 +62,7 @@ splineCircle::usage = "splineCircle[c,r,angles] produces a BSplineCurve object r
 
 Begin["`Private`"];
 
+MF[args___] := MatrixForm[args];
 
 factorInteger[n_Integer] := FactorInteger[n] // Map[Superscript[#[[1]], #[[2]]]&] // Row[#, "\[Cross]"]&;
 
@@ -188,10 +192,11 @@ dynamicPlot2[f_, {x_Symbol, x0_, x1_}, opts : OptionsPattern[]] := Module[
 ];
 
 
-Options[barChart3D] = {graphicsOptions -> {}, colorData -> "TemperatureMap", preOptions -> {}};
-barChart3D[matrix_, OptionsPattern[]] := Graphics3D[
+Options[barChart3D] = {colorData -> "TemperatureMap", preOptions -> {}};
+Options[barChart3D] = Join[Options[barChart3D], Options[Graphics3D]];
+barChart3D[matrix_, opts : OptionsPattern[]] := Graphics3D[
   {
-    Evaluate[OptionValue@preOptions],
+    Evaluate[OptionValue[preOptions]],
     Table[
       {
         If[!NumericQ[matrix[[i, j]]], {},
@@ -206,12 +211,39 @@ barChart3D[matrix_, OptionsPattern[]] := Graphics3D[
       }
     ]
   },
-  Evaluate[OptionValue@graphicsOptions]
+  Axes -> True,
+  BoxRatios -> {1, 1, 0.5},
+  Evaluate[Sequence @@ FilterRules[{opts}, Options[Graphics3D]]]
 ];
 
 
 SetAttributes[absSquared, {NumericFunction, Listable}];
 absSquared[z_] := z Conjugate[z]
+
+absArgForm[z_Complex] := Which[
+  Abs[z] == 0, 0,
+  Arg[z] == 0, Abs[z],
+  Abs[z] == 1,
+  DisplayForm @ SuperscriptBox[
+    "\[ExponentialE]", RowBox[{
+      If[Arg[z] < 0, Pi + Arg[z], Arg[z]],
+      "\[ImaginaryI]"
+    }]
+  ],
+  True,
+  DisplayForm @ RowBox[{
+    If[
+      Arg[z] < 0, -Abs[z], Abs[z]],
+    DisplayForm @ SuperscriptBox[
+      "\[ExponentialE]",
+      RowBox[{
+        If[Arg[z] < 0, Pi + Arg[z], Arg[z]],
+        "\[ImaginaryI]"
+      }]
+    ]
+  }]
+];
+absArgForm[z_?NumericQ] := z;
 
 
 ClearAll@traceView2;
