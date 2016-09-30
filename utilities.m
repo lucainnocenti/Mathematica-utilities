@@ -62,7 +62,7 @@ splineCircle::usage = "splineCircle[c,r,angles] produces a BSplineCurve object r
 
 Begin["`Private`"];
 
-MF[args___] := MatrixForm[args];
+MF[args___] := MatrixForm[Chop @ args];
 
 factorInteger[n_Integer] := FactorInteger[n] // Map[Superscript[#[[1]], #[[2]]]&] // Row[#, "\[Cross]"]&;
 
