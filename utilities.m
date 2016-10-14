@@ -222,7 +222,7 @@ barChart3D[matrix_, opts : OptionsPattern[]] := Graphics3D[
 
 
 SetAttributes[absSquared, {NumericFunction, Listable}];
-absSquared[z_] := z Conjugate[z]
+absSquared[z_] := z Conjugate[z];
 
 absArgForm[z_Complex] := Which[
   Abs[z] == 0, 0,
@@ -353,9 +353,6 @@ splineCircle[m_List, r_, angles_List : {0, 2 \[Pi]}] := Module[{seg, \[Phi], sta
 ] /; Length[m] == 2 || Length[m] == 3;
 
 
-End[];
-EndPackage[];
-
 ClearAll[replaceVars];
 replaceVars[symbols_ : None] = With[{
   pars = If[symbols === None,
@@ -367,3 +364,7 @@ replaceVars[symbols_ : None] = With[{
     pars -> RandomReal[{0, 1}, Length@pars]
   ]
 ] &;
+
+
+End[];
+EndPackage[];
