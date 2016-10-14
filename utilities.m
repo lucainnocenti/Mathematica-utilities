@@ -39,7 +39,9 @@ autoLegend::usage = "Simplified legending for the plot passed as first argument,
 
 exportHere::usage = "exportHere[fileName,object] saves object in the current directory with the name fileName.";
 absSquared::usage = "absSquared[z] returns the square of the absolute value of z.";
-absArgForm::usage = "absArgForm[z] returns the complex number z in |z| Exp[I Arg[z]] form, with the argument always between 0 and Pi."
+absArgForm::usage = "absArgForm[z] returns the complex number z in |z| Exp[I Arg[z]] form, with the argument always between 0 and Pi.";
+allReal::usage = "allReal[expr] removes all Conjugate wrapper (assuming everything is real).";
+
 traceView2::usage = "traceView2[expr] returns a formatted view of the TraceScan of the expression.";
 seeOptions::usage = "seeOptions[function] returns the list of options defined for function, without the clumsy whatever`private`stuff notation.";
 factorInteger::usage = "factorInteger[n] returns the prime integer factorization of n, nicely formatted.";
@@ -48,6 +50,7 @@ dynamicPlot2;
 texStyles;
 
 MF::usage = "MF[arg] is just an alias for MatrixForm[arg].";
+FF::usage = "FF[expr] is just an alias for FullForm[expr].";
 
 
 dynamicallyHighlight::usage = "DynamicallyHighlight[tableToHighlight,equivalenceTest] prints a dynamic version of tableToHighlight where hovering with the mouse on the element elem1 highlights all elements elem2 of tableToHighlight such that equivalenceTest[elem1,elem2] is True.";
@@ -63,6 +66,7 @@ splineCircle::usage = "splineCircle[c,r,angles] produces a BSplineCurve object r
 Begin["`Private`"];
 
 MF[args___] := MatrixForm[Chop @ args];
+FF[expr___] := FullForm[expr];
 
 factorInteger[n_Integer] := FactorInteger[n] // Map[Superscript[#[[1]], #[[2]]]&] // Row[#, "\[Cross]"]&;
 
@@ -244,6 +248,9 @@ absArgForm[z_Complex] := Which[
   }]
 ];
 absArgForm[z_?NumericQ] := z;
+absArgForm[expr_] := Replace[expr, z_Complex :> absArgForm[z], Infinity];
+
+allReal[x___] := Replace[x, Conjugate[y_] :> y, Infinity];
 
 
 ClearAll@traceView2;
@@ -348,3 +355,15 @@ splineCircle[m_List, r_, angles_List : {0, 2 \[Pi]}] := Module[{seg, \[Phi], sta
 
 End[];
 EndPackage[];
+
+ClearAll[replaceVars];
+replaceVars[symbols_ : None] = With[{
+  pars = If[symbols === None,
+    Echo[extractParameters[#], "Extracted parameters:"],
+    symbols
+  ]
+},
+  # /. Thread[
+    pars -> RandomReal[{0, 1}, Length@pars]
+  ]
+] &;
