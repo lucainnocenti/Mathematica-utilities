@@ -62,6 +62,13 @@ barChart3D::usage = "barChart3D[matrix_] draws a 3D plot chart, using the values
 
 splineCircle::usage = "splineCircle[c,r,angles] produces a BSplineCurve object representing an arc on the x-y plane, centered at the (2- or 3-dimensional) point m, with radius r, covering the angles specified in angles";
 
+randomNormal::usage = "\
+randomNormal[n] generates n normally distributed real numbers, with vanishing mean and unit variance.
+randomNormal[\[Mu], \[Sigma], n] generates n normally distributed real numbers, with mean \[Mu] and RMS \[Sigma].";
+randomComplexNormal::usage = "\
+randomComplexNormal[n] generates n normally distributed complex numbers, with vanishing mean and unit variance.
+randomComplexNormal[\[Mu], \[Sigma], n] generates n normally distributed complex numbers, with mean \[Mu] and RMS \[Sigma].";
+
 
 Begin["`Private`"];
 
@@ -152,11 +159,46 @@ legendMaker[textLabels_, opts : OptionsPattern[]] := Module[{f, lineDirectives, 
   Framed[f, FilterRules[{Sequence[opts, Options[legendMaker]]}, FilterRules[Options[Framed], Except[ImageSize]]]]];
 
 
-extractStyles[plot_] := Module[{lines, markers, points, extract = First[Normal[plot]]}, (*In a plot,the list of lines contains no insets,so I use this to find it:*)lines = Select[Cases[Normal[plot], {___, _Line, ___}, Infinity], FreeQ[#1, Inset]&];
-points = Select[Cases[Normal[plot], {___, _Point, ___}, Infinity], FreeQ[#1, Inset]&];
-(*Most plot markers are inside Inset,except for Point in list plots:*)markers = Select[extract, !FreeQ[#1, Inset]&];
-(*The function returns a list of lists:*){(*The first return value is the list of line plot styles:*)Replace[Cases[lines, {c__, Line[__], ___} :> Flatten[Directive @@ Cases[{c}, Except[_Line]]], Infinity], {} -> None], (*Second return value:marker symbols*)Replace[Join[Cases[markers, {c__, Inset[s_, pos_, d___], e___} :> If[(*markers "s" can be strings or graphics*)Head[s] === Graphics, (*Append scale factor in case it's needed later;
-default 0.01*){s, Last[{.01, d}] /. Scaled[f_] :> First[f]}, If[(*For strings,add line color if no color specified via text styles:*)FreeQ[s, CMYKColor | RGBColor | GrayLevel | Hue], Style[s, c], s]], Infinity], (*Filter out Pointsize-legends don't need it:*)Cases[points, {c___, Point[pt__], ___} :> {Graphics[{c, Point[{0, 0}]}] /. PointSize[_] :> PointSize[1], .01}, Infinity]], {} -> None]}]
+extractStyles[plot_] := Module[{lines, markers, points, extract = First[Normal[plot]]},
+(*In a plot,the list of lines contains no insets,so I use this to find it:*)
+  lines = Select[Cases[Normal[plot], {___, _Line, ___}, Infinity], FreeQ[#1, Inset]&];
+  points = Select[Cases[Normal[plot], {___, _Point, ___}, Infinity], FreeQ[#1, Inset]&];
+  (*Most plot markers are inside Inset,except for Point in list plots:*)
+  markers = Select[extract, !FreeQ[#1, Inset]&];
+  (*The function returns a list of lists:*)
+  {
+  (*The first return value is the list of line plot styles:*)
+    Replace[Cases[lines, {c__, Line[__], ___} :> Flatten[Directive @@ Cases[{c}, Except[_Line]]], Infinity], {} -> None],
+  (*Second return value:marker symbols*)
+    Replace[
+      Join[
+        Cases[
+          markers,
+          {c__, Inset[s_, pos_, d___], e___} :> If[
+          (*markers "s" can be strings or graphics*)
+            Head[s] === Graphics,
+          (*Append scale factor in case it's needed later; default 0.01*)
+            {s, Last[{.01, d}] /. Scaled[f_] :> First[f]},
+            If[
+            (*For strings,add line color if no color specified via text styles:*)
+              FreeQ[s, CMYKColor | RGBColor | GrayLevel | Hue],
+              Style[s, c],
+              s
+            ]
+          ],
+          Infinity
+        ],
+      (*Filter out Pointsize-legends don't need it:*)
+        Cases[
+          points,
+          {c___, Point[pt__], ___} :> {Graphics[{c, Point[{0, 0}]}] /. PointSize[_] :> PointSize[1], .01},
+          Infinity
+        ]
+      ],
+      {} -> None
+    ]
+  }
+];
 
 Options[autoLegend] = Join[{Alignment -> {Right, Top}, Background -> White, AspectRatio -> Automatic}, FilterRules[Options[legendMaker], Except[Alignment | Background | AspectRatio]]];
 autoLegend[plot_Graphics, labels_, opts : OptionsPattern[]] := Module[{lines, markers, align = OptionValue[Alignment]}, {lines, markers} = extractStyles[plot];
@@ -253,9 +295,9 @@ absArgForm[expr_] := Replace[expr, z_Complex :> absArgForm[z], Infinity];
 allReal[x___] := Replace[x, Conjugate[y_] :> y, Infinity];
 
 
-ClearAll@traceView2;
-SetAttributes[traceView2, {HoldAllComplete}];
-traceView2[expr_] := Module[{steps = {}, stack = {}, pre, post, show, dynamic},
+ClearAll@traceView;
+SetAttributes[traceView, {HoldAllComplete}];
+traceView[expr_] := Module[{steps = {}, stack = {}, pre, post, show, dynamic},
   pre[e_] := (
     stack = {steps, stack};
     steps = {}
@@ -364,6 +406,27 @@ replaceVars[symbols_ : None] = With[{
     pars -> RandomReal[{0, 1}, Length@pars]
   ]
 ] &;
+
+randomNormal[n_] := RandomVariate[NormalDistribution[], n];
+randomNormal[\[Mu]_, \[Sigma]_, n_] := RandomVariate[NormalDistribution[\[Mu], \[Sigma]], n];
+
+randomComplexNormal[n_Integer] := #[[All, 1]] + I #[[All, 2]] & @ RandomVariate[NormalDistribution[0, 1 / Sqrt@2], {n, 2}];
+randomComplexNormal[ns : {__Integer}] := With[{alls = Sequence @@ ConstantArray[All, Length@ns]},
+  #[[alls, 1]] + I #[[alls, 2]] & @ RandomVariate[NormalDistribution[0, 1 / Sqrt@2], Append[ns, 2]]
+];
+randomComplexNormal[\[Mu]_, \[Sigma]_, n_Integer] := Plus[
+  \[Mu],
+  #[[All, 1]] + I #[[All, 2]] & @
+      RandomVariate[NormalDistribution[0, \[Sigma] / Sqrt@2], {n, 2}]
+];
+randomComplexNormal[\[Mu]_, \[Sigma]_, ns : {__Integer}] := Plus[
+  \[Mu],
+  With[{alls = Sequence @@ ConstantArray[All, Length@ns]},
+    #[[alls, 1]] + I #[[alls, 2]] & @
+        RandomVariate[NormalDistribution[0, \[Sigma] / Sqrt@2],
+          Append[ns, 2]]
+  ]
+];
 
 
 End[];
