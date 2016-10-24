@@ -69,6 +69,9 @@ randomComplexNormal::usage = "\
 randomComplexNormal[n] generates n normally distributed complex numbers, with vanishing mean and unit variance.
 randomComplexNormal[\[Mu], \[Sigma], n] generates n normally distributed complex numbers, with mean \[Mu] and RMS \[Sigma].";
 
+extractParameters::usage = "extractParameters[expr] tries to extract all parameters of the form a[1], a[2], g[3] and so on.";
+replaceVars::usage = "replaceVars[][expr] replaces with random values all parameters extracted in expr through extractParameters.";
+
 
 Begin["`Private`"];
 
@@ -395,6 +398,16 @@ splineCircle[m_List, r_, angles_List : {0, 2 \[Pi]}] := Module[{seg, \[Phi], sta
 ] /; Length[m] == 2 || Length[m] == 3;
 
 
+ClearAll[extractParameters];
+extractParameters[expr_] := Union[
+  Cases[
+    expr,
+    Except[
+      HoldPattern[Complex[__] | Rational[__]], _Symbol[__Integer]
+    ],
+    Infinity
+  ]
+];
 ClearAll[replaceVars];
 replaceVars[symbols_ : None] = With[{
   pars = If[symbols === None,
