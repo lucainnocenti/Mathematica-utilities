@@ -243,26 +243,29 @@ dynamicPlot2[f_, {x_Symbol, x0_, x1_}, opts : OptionsPattern[]] := Module[
 
 Options[barChart3D] = {colorData -> "TemperatureMap", preOptions -> {}};
 Options[barChart3D] = Join[Options[barChart3D], Options[Graphics3D]];
-barChart3D[matrix_, opts : OptionsPattern[]] := Graphics3D[
-  {
-    Evaluate[OptionValue[preOptions]],
-    Table[
-      {
-        If[!NumericQ[matrix[[i, j]]], {},
-          Sequence @@ {
-            ColorData[OptionValue@colorData][matrix[[i, j]]],
-            Cuboid[{i - 1 / 2, j - 1 / 2, 0}, {i + 1 / 2, j + 1 / 2, matrix[[i, j]]}]
-          }
-        ]
-      },
-      {i, Length@matrix},
-      {j, Length@matrix[[1, All]]
-      }
-    ]
-  },
-  Axes -> True,
-  BoxRatios -> {1, 1, 0.5},
-  Evaluate[Sequence @@ FilterRules[{opts}, Options[Graphics3D]]]
+barChart3D[matrix_, opts : OptionsPattern[]] := With[
+  {minmax = MinMax @ Flatten @ matrix},
+  Graphics3D[
+    {
+      Evaluate[OptionValue[preOptions]],
+      Table[
+        {
+          If[!NumericQ[matrix[[i, j]]], {},
+            Sequence @@ {
+              ColorData[OptionValue@colorData][(matrix[[i, j]] - First @ minmax) / (Last @ minmax - First @ minmax)],
+              Cuboid[{i - 1 / 2, j - 1 / 2, 0}, {i + 1 / 2, j + 1 / 2, matrix[[i, j]]}]
+            }
+          ]
+        },
+        {i, Length@matrix},
+        {j, Length@matrix[[1, All]]
+        }
+      ]
+    },
+    Axes -> True,
+    BoxRatios -> {1, 1, 0.5},
+    Evaluate[Sequence @@ FilterRules[{opts}, Options[Graphics3D]]]
+  ]
 ];
 
 
