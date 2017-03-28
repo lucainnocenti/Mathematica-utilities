@@ -210,42 +210,52 @@ extractStyles[plot_] := Module[{lines, markers, points, extract = First[Normal[p
   }
 ];
 
-Options[autoLegend] = Join[{Alignment -> {Right, Top}, Background -> White, AspectRatio -> Automatic}, FilterRules[Options[legendMaker], Except[Alignment | Background | AspectRatio]]];
-autoLegend[plot_Graphics, labels_, opts : OptionsPattern[]] := Module[{lines, markers, align = OptionValue[Alignment]}, {lines, markers} = extractStyles[plot];
-Graphics[{Inset[plot, {-1, -1}, {Left, Bottom}, Scaled[1]], Inset[legendMaker[labels, PlotStyle -> lines, PlotMarkers -> markers, Sequence @@ FilterRules[{opts}, FilterRules[Options[legendMaker], Except[Alignment]]]], align, Map[If[NumericQ[#], Center, #]&, align]]}, PlotRange -> {{-1, 1}, {-1, 1}}, AspectRatio -> (OptionValue[AspectRatio] /. Automatic :> (AspectRatio /. Options[plot, AspectRatio]) /. Automatic :> (AspectRatio /. AbsoluteOptions[plot, AspectRatio]))]]
+Options[autoLegend] = Join[{
+  Alignment -> {Right, Top},
+  Background -> White,
+  AspectRatio -> Automatic
+  },
+  FilterRules[Options[legendMaker], Except[Alignment | Background | AspectRatio]]
+];
+autoLegend[plot_Graphics, labels_, opts : OptionsPattern[]] := Module[
+  {lines, markers, align = OptionValue[Alignment]},
+  {lines, markers} = extractStyles[plot];
+  Graphics[{
+      Inset[plot, {-1, -1}, {Left, Bottom}, Scaled[1]],
+      Inset[
+        legendMaker[labels,
+          PlotStyle -> lines,
+          PlotMarkers -> markers,
+          Sequence @@ FilterRules[{opts},
+            FilterRules[Options[legendMaker], Except[Alignment]]]
+        ],
+        align,
+        Map[If[NumericQ[#], Center, #]&, align]
+      ]
+    },
+    PlotRange -> {{-1, 1}, {-1, 1}},
+    AspectRatio -> (OptionValue[AspectRatio] /. Automatic :> (AspectRatio /. Options[plot, AspectRatio]) /. Automatic :> (AspectRatio /. AbsoluteOptions[plot, AspectRatio]))
+  ]
+]
 
 
 SetAttributes[dynamicPlot, HoldAll]
-
 Options[dynamicPlot] = Join[Options[Plot], Options[Dynamic]];
-
 dynamicPlot[f_, {x_Symbol, x0_, x1_}, opts : OptionsPattern[]] :=
-    Module[{bag = Internal`Bag[]},
-      PrintTemporary@Dynamic[
-        ListPlot[Sort@Internal`BagPart[bag, All],
-          Evaluate[Sequence @@ FilterRules[{opts}, Options[ListPlot]]]
-        ],
-        Evaluate[Sequence @@ FilterRules[{opts}, Options[Dynamic]]],
-        UpdateInterval -> 0.5
-      ];
-      Plot[f[x], {x, x0, x1},
-        EvaluationMonitor :> (Internal`StuffBag[bag, {x, f[x]}]),
-        Evaluate[Sequence @@ FilterRules[{opts}, Options[Plot]]]
-      ]
+  Module[{bag = Internal`Bag[]},
+    PrintTemporary @ Dynamic[
+      ListPlot[
+        Sort @ Internal`BagPart[bag, All],
+        Evaluate[Sequence @@ FilterRules[{opts}, Options[ListPlot]]]
+      ],
+      Evaluate[Sequence @@ FilterRules[{opts}, Options[Dynamic]]],
+      UpdateInterval -> 0.01
     ];
-
-SetAttributes[dynamicPlot2, HoldAll]
-Options[dynamicPlot2] = Join[Options[Plot], Options[ListPlot]];
-dynamicPlot2[f_, {x_Symbol, x0_, x1_}, opts : OptionsPattern[]] := Module[
-  {bag = Internal`Bag[], a = False},
-  Plot[f, {x, x0, x1},
-    EvaluationMonitor :> (Internal`StuffBag[bag, {x, f}];a = !a),
-    Evaluate[Sequence @@ FilterRules[{opts}, Options[Plot]]]
-  ] ~ Monitor ~ ListPlot[
-    (a;Sort@Internal`BagPart[bag, All]),
-    Evaluate[Sequence @@ FilterRules[{opts}, Options[ListPlot]]]
-  ]
-];
+    Plot[f, {x, x0, x1},
+      EvaluationMonitor :> (Internal`StuffBag[bag, {x, f}]),
+      Evaluate[Sequence @@ FilterRules[{opts}, Options[Plot]]]
+    ]
+  ];
 
 
 Options[barChart3D] = {colorData -> "TemperatureMap", preOptions -> {}};
