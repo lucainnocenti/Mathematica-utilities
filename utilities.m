@@ -9,7 +9,8 @@ conditionalMonitor::usage = "conditionalMonitor[test,i] gives a function which m
 
 
 (* CLEAR MEMOIZED VALUES UTILITIES *)
-clearDownValues::usage = "ClearDownValues[p] removes the downvalues given in input as a pattern.";
+clearDownValues::usage = "ClearDownValues[p] removes the downvalues given in \
+input as a pattern.";
 ClearMemoizedValues::usage = "ClearMemoizedValues[f] clears all memoized values from f.";
 
 
@@ -69,16 +70,23 @@ randomComplexNormal[\[Mu], \[Sigma], n] generates n normally distributed complex
 
 
 (* Parameters extraction and replacing *)
-extractParameters::usage = "extractParameters[expr] tries to extract all parameters of the form a[1], a[2], g[3] and so on.";
+extractParameters::usage = "extractParameters[expr] tries to extract all parameters of the form a[1], a[2], g[3] etc.";
 replaceVars::usage = "replaceVars[][expr] replaces with random values all parameters extracted in expr through extractParameters.";
 
 
 (* Interactive controllers *)
 dynamicalSwitcher;
 
+(* add new aliases *)
+AddInputAlias;
+AddInputAliases;
+
 (* Other fun stuff *)
 mouseHavingFun;
 
+
+(* Evaluation handling *)
+step;
 
 Begin["`Private`"];
 
@@ -317,7 +325,7 @@ absArgForm[expr_] := Replace[expr, z_Complex :> absArgForm[z], Infinity];
 allReal[x___] := Replace[x, Conjugate[y_] :> y, Infinity];
 
 
-ClearAll@traceView;
+ClearAll @ traceView;
 SetAttributes[traceView, {HoldAllComplete}];
 traceView[expr_] := Module[{steps = {}, stack = {}, pre, post, show, dynamic},
   pre[e_] := (
@@ -463,7 +471,7 @@ randomComplexNormal[\[Mu]_, \[Sigma]_, ns : {__Integer}] := Plus[
 ];
 
 
-ClearAll@dynamicalSwitcher;
+ClearAll @ dynamicalSwitcher;
 Attributes[dynamicalSwitcher] = {HoldAll};
 dynamicalSwitcher[positions_, opts : OptionsPattern[]] := With[
   {nSquares = Length@positions},
@@ -516,6 +524,26 @@ dynamicalSwitcher[positions_, opts : OptionsPattern[]] := With[
       ImageSize -> Large
     ]
   ]
+];
+
+
+AddInputAliases[rules_List] := SetOptions[
+  EvaluationNotebook[],
+  InputAliases -> DeleteDuplicates @ Join[rules,
+    InputAliases /.
+    Quiet[Options[EvaluationNotebook[], InputAliases]] /.
+    InputAliases -> {}
+  ]
+];
+
+AddInputAlias[rule_Rule] := AddInputAliases[{rule}];
+
+
+(* Evaluation handling *)
+SetAttributes[step, HoldAll];
+step[expr_] := Module[{P},
+  P = (P = Return[# /. HoldForm[x_] :> Defer[step[x]], TraceScan] &) &;
+  TraceScan[P, expr, TraceDepth -> 1]
 ];
 
 
