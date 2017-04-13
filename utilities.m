@@ -22,7 +22,7 @@ autoLegend::usage = "Simplified legending for the plot passed as first argument,
 
 
 (* Saving utilities *)
-exportHere::usage = "exportHere[fileName,object] saves object in the current directory with the name fileName.";
+exportHere::usage = "exportHere[fileName, object] saves object in the current directory with the name fileName.";
 
 
 (* Visualization manipulation *)
@@ -87,6 +87,13 @@ mouseHavingFun;
 
 (* Evaluation handling *)
 step;
+
+(* Algebra utilities *)
+symbolicNonCommutativeProduct::usage = "symbolicNonCommutativeProduct[expr] \
+evaluates the input expression without assuming that the symbols commute. By \
+default all (and only) the numerical values are treated as scalars, and all \
+the symbols as non-commuting operators. The options \"Scalars\" and \"Additio\
+nalOperatorRules\" can be used to override this assumption."
 
 Begin["`Private`"];
 
@@ -557,6 +564,84 @@ mouseHavingFun[] := (
     {x, 0, 4 Pi, .001}
   ];
 );
+
+
+Attributes[makeAdditionalOperatorRules] = HoldAll;
+makeAdditionalOperatorRules[args_List] := Block[{eqs, lhs, rhs, symbNCP},
+  eqs = Sequence @@ Map[Hold, Hold @ args, {2}] // Evaluate;
+  symbNCP = Function[Null,
+    symbolicNonCommutativeProduct[#, "NonCommutativeProductWrapper" -> times],
+    HoldAll
+  ];
+  Table[
+    lhs = eq[[{1}, 1]] /. Hold[s__] :> symbNCP @ s;
+    lhs = With[{lhsToInject = Sequence @@ lhs},
+      eq[[{1}, 1]] /.
+        Hold[s__] :> Hold[times[left___, lhsToInject, right___]]
+    ];
+
+    rhs = eq[[{1}, 2]] /. Hold[s__] :> symbNCP @ s;
+    rhs = With[{rhsToInject = rhs},
+      eq[[{1}, 1]] /.
+        Hold[s__] :> Hold[times[left, rhsToInject, right]]
+    ];
+    (* output *)
+    {lhs, rhs} /. {Hold[left__], Hold[right__]} :> (left :> right),
+    (* iterators *)
+    {eq, eqs}
+  ]
+];
+makeAdditionalOperatorRules[Hold[args__]] :=
+  makeAdditionalOperatorRules @ {args}
+
+Attributes[symbolicNonCommutativeProduct] = HoldAll;
+Options[symbolicNonCommutativeProduct] = {
+  "Scalars" -> {},
+  "AdditionalOperatorRules" -> {},
+  "NonCommutativeProductWrapper" -> NonCommutativeMultiply
+};
+symbolicNonCommutativeProduct[expr_, OptionsPattern[]] := With[{
+    exprNC = ReleaseHold[
+        Hold[expr] /. {
+          Times -> times,
+          Power[s_, n_Integer /; n > 0] :> times @@ ConstantArray[s, n]
+        }
+      ],
+    scalarQ = (NumericQ @ # || MemberQ[OptionValue @ "Scalars", #]) &,
+    customRules = If[
+      MatchQ[OptionValue @ "AdditionalOperatorRules", _Hold],
+      makeAdditionalOperatorRules@
+        Evaluate @ OptionValue @ "AdditionalOperatorRules",
+      (* else.. *)
+        {}
+    ]
+  },
+  exprNC //. {
+    (*s:_times/;(
+    Print@Panel@Row@{"Current state: ",
+    Style[s,Red]
+    };False
+    )\[RuleDelayed]Null,*)
+
+    (* Take scalars out of sum *)
+    times[left___, a_?scalarQ * middle___, right___] :>
+      a times[left, middle, right],
+    times[left___, a_?scalarQ, right___] :> a times[left, right],
+
+    (* Simulate Flat and OneIdentity properties (kind of) *)
+    times[s : (_Symbol | _?NumericQ | _times)] :> s,
+    times[left___, times[middle___], right___] :> times[left, middle, right],
+    times[] :> 1,
+
+    (* Distribute times over Plus *)
+    times[left___, HoldPattern@Plus[middle__], right___] :> (
+      Plus @@ (times[left, #, right] & /@ {middle})
+    ),
+
+    (* Apply additional rules if specified *)
+    Sequence @@ customRules
+  } /. times -> OptionValue @ "NonCommutativeProductWrapper"
+];
 
 End[];
 EndPackage[];
