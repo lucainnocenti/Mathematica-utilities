@@ -597,6 +597,7 @@ makeAdditionalOperatorRules[Hold[args__]] :=
 Attributes[symbolicNonCommutativeProduct] = HoldAll;
 Options[symbolicNonCommutativeProduct] = {
   "Scalars" -> {},
+  "ScalarsPattern" -> None,
   "AdditionalOperatorRules" -> {},
   "NonCommutativeProductWrapper" -> NonCommutativeMultiply
 };
@@ -607,13 +608,16 @@ symbolicNonCommutativeProduct[expr_, OptionsPattern[]] := With[{
           Power[s_, n_Integer /; n > 0] :> times @@ ConstantArray[s, n]
         }
       ],
-    scalarQ = (NumericQ @ # || MemberQ[OptionValue @ "Scalars", #]) &,
+    scalar = If[OptionValue @ "ScalarsPattern" =!= None,
+      OptionValue @ "ScalarsPattern",
+      _ ? (NumericQ @ # || MemberQ[OptionValue @ "Scalars", #] &)
+    ],
     customRules = If[
       MatchQ[OptionValue @ "AdditionalOperatorRules", _Hold],
-      makeAdditionalOperatorRules@
+      makeAdditionalOperatorRules @
         Evaluate @ OptionValue @ "AdditionalOperatorRules",
       (* else.. *)
-        {}
+      {}
     ]
   },
   exprNC //. {
@@ -623,20 +627,23 @@ symbolicNonCommutativeProduct[expr_, OptionsPattern[]] := With[{
     };False
     )\[RuleDelayed]Null,*)
 
+    (* Distribute times over Plus *)
+    times[left___, HoldPattern @ Plus[middle__], right___] :> (
+      Plus @@ (times[left, #, right] & /@ {middle})
+    ),
+    
     (* Take scalars out of sum *)
-    times[left___, a_?scalarQ * middle___, right___] :>
+    times[left___, (a : scalar) * middle___, right___] :>
       a times[left, middle, right],
-    times[left___, a_?scalarQ, right___] :> a times[left, right],
+    times[left___, a : scalar /; Head @ a =!= times, right___] :> Times[
+      a,
+      times[left, right]
+    ],
 
     (* Simulate Flat and OneIdentity properties (kind of) *)
     times[s : (_Symbol | _?NumericQ | _times)] :> s,
     times[left___, times[middle___], right___] :> times[left, middle, right],
     times[] :> 1,
-
-    (* Distribute times over Plus *)
-    times[left___, HoldPattern@Plus[middle__], right___] :> (
-      Plus @@ (times[left, #, right] & /@ {middle})
-    ),
 
     (* Apply additional rules if specified *)
     Sequence @@ customRules
