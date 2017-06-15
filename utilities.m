@@ -2,6 +2,8 @@
 
 BeginPackage["utilities`"]
 
+Unprotect @@ Names["utilities`*"];
+ClearAll @@ Names["utilities`*"];
 
 (* MONITORING UTILITIES *)
 progressBar::usage = "progressBar[n] displays a progress bar with progress n%.";
@@ -54,6 +56,10 @@ FF::usage = "FF[expr] is just an alias for FullForm[expr].";
 dynamicallyHighlight::usage = "DynamicallyHighlight[tableToHighlight,equivalenceTest] prints a dynamic version of tableToHighlight where hovering with the mouse on the element elem1 highlights all elements elem2 of tableToHighlight such that equivalenceTest[elem1,elem2] is True.";
 dynamicallyAddText;
 
+
+(* Graphics utilities *)
+gridLines;
+MP;
 
 (* 3D Plotting utilities *)
 barChart3D::usage = "barChart3D[matrix_] draws a 3D plot chart, using the values of the input matrix as heights of the cuboids.";
@@ -139,7 +145,7 @@ seeOptions[function_] := Thread@Rule[
 
 ClearAll[simpleLegend];
 Options[simpleLegend] = {fontSize -> 11, imageSize -> {20, 10}, insetpts -> 10, lineThickness -> 0.001};
-simpleLegend[legendItems__, pos_, opts : OptionsPattern[]] := Module[{legendLine, offset, legend},
+simpleLegend[legendItems__, pos_, OptionsPattern[]] := Module[{legendLine, offset, legend},
   offset = Module[{s, o},
     s = pos /. {Left -> 0, Right -> 1, Bottom -> 0, Top -> 1};
     o = OptionValue@insetpts pos /. {Left -> 1, Right -> -1, Bottom -> 1, Top -> -1};
@@ -298,6 +304,23 @@ barChart3D[matrix_, opts : OptionsPattern[]] := With[
     BoxRatios -> {1, 1, 0.5},
     Evaluate[Sequence @@ FilterRules[{opts}, Options[Graphics3D]]]
   ]
+];
+
+
+gridLines[dim_Integer, gridSpacing_Integer] := {Black, FaceForm[],
+  EdgeForm[{Thick, Black}],
+  Rectangle @@ ## & /@ (
+    {#, # + gridSpacing} & /@
+      Tuples[#, {2}] & @ Range[0, dim - gridSpacing, gridSpacing]
+  )
+};
+
+Options@MP = Options@MatrixPlot;
+MP[expr_, opts : OptionsPattern[]] := MatrixPlot[
+  expr,
+  Evaluate @ FilterRules[{opts}, Options @ MatrixPlot],
+  PlotRangePadding -> None,
+  Mesh -> All, MeshStyle -> Gray
 ];
 
 
@@ -631,7 +654,7 @@ symbolicNonCommutativeProduct[expr_, OptionsPattern[]] := With[{
     times[left___, HoldPattern @ Plus[middle__], right___] :> (
       Plus @@ (times[left, #, right] & /@ {middle})
     ),
-    
+
     (* Take scalars out of sum *)
     times[left___, (a : scalar) * middle___, right___] :>
       a times[left, middle, right],
@@ -648,6 +671,12 @@ symbolicNonCommutativeProduct[expr_, OptionsPattern[]] := With[{
     (* Apply additional rules if specified *)
     Sequence @@ customRules
   } /. times -> OptionValue @ "NonCommutativeProductWrapper"
+];
+
+
+(* Protect all package symbols *)
+With[{syms = Names["utilities`*"]},
+  SetAttributes[syms, {Protected, ReadProtected}]
 ];
 
 End[];
