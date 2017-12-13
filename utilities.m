@@ -60,6 +60,7 @@ dynamicallyAddText;
 (* Graphics utilities *)
 gridLines;
 MP;
+dynamicMatrixPlot;
 
 (* 3D Plotting utilities *)
 barChart3D::usage = "barChart3D[matrix_] draws a 3D plot chart, using the values of the input matrix as heights of the cuboids.";
@@ -99,7 +100,7 @@ symbolicNonCommutativeProduct::usage = "symbolicNonCommutativeProduct[expr] \
 evaluates the input expression without assuming that the symbols commute. By \
 default all (and only) the numerical values are treated as scalars, and all \
 the symbols as non-commuting operators. The options \"Scalars\" and \"Additio\
-nalOperatorRules\" can be used to override this assumption."
+nalOperatorRules\" can be used to override this assumption.";
 
 Begin["`Private`"];
 
@@ -315,7 +316,10 @@ gridLines[dim_Integer, gridSpacing_Integer] := {Black, FaceForm[],
   )
 };
 
-Options@MP = Options@MatrixPlot;
+
+(* MP is just a shorthand for MatrixPlot, with some predefined commonly used
+   options *)
+Options @ MP = Options @ MatrixPlot;
 MP[expr_, opts : OptionsPattern[]] := MatrixPlot[
   expr,
   Evaluate @ FilterRules[{opts}, Options @ MatrixPlot],
@@ -324,8 +328,164 @@ MP[expr_, opts : OptionsPattern[]] := MatrixPlot[
 ];
 
 
+(* ------ BEGIN dynamicMatrixPlot and utilities ------ *)
+
+rowNumber[matrix_] := If[# === None, #,
+  If[
+    MatchQ[#, _Integer ? (1 <= # <= Length @ matrix &)],
+    #, None
+  ] & [
+    1 + Length @ matrix - Last @ Floor[# + 1]
+  ]
+] & @ MousePosition["Graphics"];
+
+
+colNumber[matrix_] := If[# === None, #,
+  If[
+    MatchQ[#, _Integer ? (1 <= # <= Last @ Dimensions @ matrix &)],
+    #, None
+  ] & [
+    First @ Floor[# + 1]
+  ]
+] & @ MousePosition["Graphics"];
+
+
+mouseOnGraphics[] := MousePosition["Graphics"] =!= None;
+
+
+switchRows[matrix_, row1_, row2_] := ReplacePart[matrix,
+  {row1 -> matrix[[row2]],
+   row2 -> matrix[[row1]]}
+];
+
+
+switchCols[matrix_, col1_, col2_] := ReplacePart[matrix,
+  {
+    {row_, col1} :> matrix[[row, col2]],
+    {row_, col2} :> matrix[[row, col1]]
+  }
+];
+
+
+(* Replace neighboring rows or columns, conditionally to the value of `which`.
+   The change is done in-place, that is, the value of `matrixVar` is changed
+   directly. *)
+Attributes @ switchNeighborsInPlace = HoldFirst;
+switchNeighborsInPlace[
+  matrixVar_, idx1_, idx2_, which : ("Rows" | "Cols")
+] := Set[matrixVar,
+  Which[
+    which == "Cols",
+    switchCols[matrixVar, idx1, idx2],
+    which == "Rows",
+    switchRows[matrixVar, idx1, idx2]
+  ]
+];
+
+
+Attributes @ conditionallySwitchNeighbors = HoldAll;
+conditionallySwitchNeighbors[
+  matrix_, labelsList_, oldIdx_, newIdx_, which : ("Rows" | "Cols")
+] := If[
+  Abs[oldIdx - newIdx] == 1 // TrueQ,
+  switchNeighborsInPlace[matrix, oldIdx, newIdx, which];
+  labelsList[[{oldIdx, newIdx}]] = labelsList[[{newIdx, oldIdx}]];
+  oldIdx = newIdx
+];
+
+
+drawHighlightingRectangles[len_, row_, col_] := {
+  FaceForm[], EdgeForm[{Red, Thickness @ 0.01}],
+  If[NumericQ @ row,
+    Rectangle[{0, len - row}, {len, len - row + 1}],
+    Sequence[]
+  ],
+  FaceForm[], EdgeForm[{Purple, Thickness @ 0.01}],
+  If[NumericQ @ col,
+    Rectangle[{col - 1, 0}, {col, len}],
+    Sequence[]
+  ]
+};
+
+
+makeFrameTicks[len_Integer, labels_List] := {
+  {#, #}, {#, #}
+} & @ Thread @ {Range @ len, labels};
+
+makeFrameTicks[lenghts_List, labelsRows_List, labelsCols_List] := {
+  {#1, #1}, {#2, #2}
+} & [
+  Thread @ {Range @ lenghts[[1]], labelsRows},
+  Thread @ {Range @ lenghts[[2]], labelsCols}
+];
+
+makeFrameTicks[labels_List] := makeFrameTicks[Length @ labels, labels];
+makeFrameTicks[labelsRows_List, labelsCols_List] := makeFrameTicks[
+  Length /@ {labelsRows, labelsCols}, labelsRows, labelsCols
+];
+
+
+Attributes @ dynamicMatrixPlot = HoldFirst;
+
+Options @ dynamicMatrixPlot = {"OverlayRectangles" -> False};
+
+dynamicMatrixPlot[matrix_, opts : OptionsPattern[]] := If[
+  (* If the input is directly given as a matrix, we make local variable holding
+     it and recall the function with that variable as argument *)
+  ! MatchQ[Hold @ matrix, Hold @ _Symbol],
+  Module[{mat = matrix}, dynamicMatrixPlot[mat, opts]],
+
+  With[{overlayRectangles = TrueQ @ OptionValue @ "OverlayRectangles"},
+  DynamicModule[{
+      len = Length @ matrix,
+      oldRow, oldCol,
+      rowsOrder = Range @ Length @ matrix,
+      colsOrder = Range @ Length @ matrix
+    },
+    EventHandler[
+      Dynamic @ MP[matrix,
+        (* Epilog is used to draw the rectangles highlighting the row/column
+           that is being moved *)
+        If[overlayRectangles,
+          Epilog -> drawHighlightingRectangles[len, oldRow, oldCol],
+          Unevaluated @ Sequence[]
+        ],
+        FrameTicks -> makeFrameTicks @@ {rowsOrder, colsOrder}
+      ],
+      {
+        "MouseDown" :> (
+          Set[oldRow, rowNumber @ matrix];
+          Set[oldCol, colNumber @ matrix]
+        ),
+        "MouseDragged" :> (
+          If[And[
+              mouseOnGraphics[],
+              rowNumber @ matrix =!= None,
+              colNumber @ matrix =!= None
+            ],
+            (* conditionallySwitchNeighbors handles the switching of neighboring
+               rows and columns. Note that it also changed in-place `oldRow`
+               and `oldCol`. *)
+            conditionallySwitchNeighbors[
+              matrix, rowsOrder, oldRow, rowNumber @ matrix, "Rows"
+            ];
+            conditionallySwitchNeighbors[
+              matrix, colsOrder, oldCol, colNumber @ matrix, "Cols"
+            ]
+          ];
+        )
+      }
+    ]
+  ]]
+];
+
+
+(* ------ END dynamicMatrixPlot and utilities ------ *)
+
+
 SetAttributes[absSquared, {NumericFunction, Listable}];
 absSquared[z_] := z Conjugate[z];
+
 
 absArgForm[z_Complex] := Which[
   Abs[z] == 0, 0,
@@ -455,8 +615,11 @@ splineCircle[m_List, r_, angles_List : {0, 2 \[Pi]}] := Module[{seg, \[Phi], sta
 ] /; Length[m] == 2 || Length[m] == 3;
 
 
-ClearAll[extractParameters];
-extractParameters[expr_] := Union[
+extractParameters[coeff_Symbol][expr_] := Union @ Cases[
+  expr, coeff[__Integer], Infinity
+];
+
+extractParameters[expr_?(!AtomQ @ # &)] := Union[
   Cases[
     expr,
     Except[
@@ -465,7 +628,8 @@ extractParameters[expr_] := Union[
     Infinity
   ]
 ];
-ClearAll[replaceVars];
+
+
 replaceVars[symbols_ : None] = With[{
   pars = If[symbols === None,
     Echo[extractParameters[#], "Extracted parameters:"],
@@ -600,13 +764,13 @@ makeAdditionalOperatorRules[args_List] := Block[{eqs, lhs, rhs, symbNCP},
     lhs = eq[[{1}, 1]] /. Hold[s__] :> symbNCP @ s;
     lhs = With[{lhsToInject = Sequence @@ lhs},
       eq[[{1}, 1]] /.
-        Hold[s__] :> Hold[times[left___, lhsToInject, right___]]
+        Hold[__] :> Hold[times[left___, lhsToInject, right___]]
     ];
 
     rhs = eq[[{1}, 2]] /. Hold[s__] :> symbNCP @ s;
     rhs = With[{rhsToInject = rhs},
       eq[[{1}, 1]] /.
-        Hold[s__] :> Hold[times[left, rhsToInject, right]]
+        Hold[__] :> Hold[times[left, rhsToInject, right]]
     ];
     (* output *)
     {lhs, rhs} /. {Hold[left__], Hold[right__]} :> (left :> right),
