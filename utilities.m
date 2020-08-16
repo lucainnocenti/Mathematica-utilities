@@ -65,6 +65,7 @@ dynamicMatrixPlot;
 (* 3D Plotting utilities *)
 barChart3D::usage = "barChart3D[matrix_] draws a 3D plot chart, using the values of the input matrix as heights of the cuboids.";
 splineCircle::usage = "splineCircle[c,r,angles] produces a BSplineCurve object representing an arc on the x-y plane, centered at the (2- or 3-dimensional) point m, with radius r, covering the angles specified in angles";
+fromSphericalCoordinates::usage = "fromSphericalCoordinates[r, theta, phi] is a safer version of FromSphericalCoordinates which accepts more flexible angle ranges.";
 
 
 (* Generation of random numbers *)
@@ -101,6 +102,7 @@ evaluates the input expression without assuming that the symbols commute. By \
 default all (and only) the numerical values are treated as scalars, and all \
 the symbols as non-commuting operators. The options \"Scalars\" and \"Additio\
 nalOperatorRules\" can be used to override this assumption.";
+
 
 Begin["`Private`"];
 
@@ -613,6 +615,24 @@ splineCircle[m_List, r_, angles_List : {0, 2 \[Pi]}] := Module[{seg, \[Phi], sta
   k = Join[{0, 0, 0}, Riffle[#, #]&@Range[seg + 1], {seg + 1}];
   BSplineCurve[pts, SplineDegree -> 2, SplineKnots -> k, SplineWeights -> w]
 ] /; Length[m] == 2 || Length[m] == 3;
+
+(*
+  Do the same job as FromSphericalCoordinates, but being more flexible with the 
+  allowed values of the angles. For example, don't throw an error for theta==Pi or
+  theta > Pi.
+*)
+fromSphericalCoordinates[{r_, theta_, phi_}] := Which[
+  r == 0, {0, 0, 0},
+  theta == 0, {0, 0, 1},
+  theta == Pi, {0, 0, -1},
+  Pi < theta < 2 Pi, fromSphericalCoordinates @ {r, 2 Pi - theta, -phi},
+  phi > Pi, fromSphericalCoordinates @ {r, theta, phi - 2 Pi},
+  phi <= -Pi, fromSphericalCoordinates @ {r, theta, phi + 2 Pi},
+  True, FromSphericalCoordinates @ {r, theta, phi}
+];
+fromSphericalCoordinates[r_, theta_, phi_] := fromSphericalCoordinates@{r, theta, phi};
+fromSphericalCoordinates[{theta_, phi_}] := fromSphericalCoordinates@{1, theta, phi};
+fromSphericalCoordinates[theta_, phi_] := fromSphericalCoordinates@{1, theta, phi};
 
 
 extractParameters[coeff_Symbol][expr_] := Union @ Cases[
