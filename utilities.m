@@ -104,6 +104,14 @@ the symbols as non-commuting operators. The options \"Scalars\" and \"Additio\
 nalOperatorRules\" can be used to override this assumption.";
 
 
+(* Information theory utilities *)
+shannonEntropy;
+marginalProbabilityDistribution;
+mutualInformation;
+conditionalEntropyXcY;
+conditionalEntropyYcX;
+
+
 Begin["`Private`"];
 
 MF[args___] := MatrixForm[Chop @ args];
@@ -600,9 +608,9 @@ splineCircle[m_List, r_, angles_List : {0, 2 \[Pi]}] := Module[{seg, \[Phi], sta
   seg = Quotient[end - start // N, \[Pi] / 2];
   \[Phi] = Mod[end - start // N, \[Pi] / 2];
   If[seg == 4, seg = 3;\[Phi] = \[Pi] / 2];
-  pts = r RotationMatrix[start].#& /@ Join[
+  pts = r RotationMatrix[start] . #& /@ Join[
     Take[{{1, 0}, {1, 1}, {0, 1}, {-1, 1}, {-1, 0}, {-1, -1}, {0, -1}}, 2 seg + 1],
-    RotationMatrix[seg \[Pi] / 2].#& /@ {{1, Tan[\[Phi] / 2]}, {Cos[\[Phi]], Sin[\[Phi]]}}
+    RotationMatrix[seg \[Pi] / 2] . #& /@ {{1, Tan[\[Phi] / 2]}, {Cos[\[Phi]], Sin[\[Phi]]}}
   ];
   If[Length[m] == 2,
     pts = m + #& /@ pts,
@@ -855,6 +863,27 @@ symbolicNonCommutativeProduct[expr_, OptionsPattern[]] := With[{
     (* Apply additional rules if specified *)
     Sequence @@ customRules
   } /. times -> OptionValue @ "NonCommutativeProductWrapper"
+];
+
+
+(* information theory utilities *)
+shannonEntropy[probs_, base_:2] := DeleteCases[probs, _?PossibleZeroQ] // -Total[# * Log[2, #]] &;
+marginalProbabilityDistribution[probs_List, sizes : {__Integer}, remainingDof_Integer] := With[
+	{probsMatrix = ArrayReshape[probs, sizes]},
+	Total[probsMatrix, Complement[Range @ Length @ sizes, {remainingDof}]]
+];
+mutualInformation[probs_List, sizes : {_Integer, _Integer} : {2, 2}] := Plus[
+	shannonEntropy[marginalProbabilityDistribution[probs, sizes, 1]],
+	shannonEntropy[marginalProbabilityDistribution[probs, sizes, 2]],
+	- shannonEntropy @ probs
+];
+conditionalEntropyXcY[probs_List, sizes : {sizeX_Integer, sizeY_Integer} : {2, 2}] := Total @ With[
+	{probsMat = ArrayReshape[probs, sizes]},
+	Transpose @ probsMat // Map[Total @ # * shannonEntropy[# / Total @ #] &]
+];
+conditionalEntropyYcX[probs_List, sizes : {sizeX_Integer, sizeY_Integer} : {2, 2}] := Total @ With[
+	{probsMat = ArrayReshape[probs, sizes]},
+	probsMat // Map[Total @ # * shannonEntropy[# / Total @ #] &]
 ];
 
 
