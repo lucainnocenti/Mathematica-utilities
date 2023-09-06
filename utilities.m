@@ -875,7 +875,7 @@ marginalProbabilityDistribution[probs_List, sizes : {__Integer}, remainingDof_In
 mutualInformation[probs_List, sizes : {_Integer, _Integer} : {2, 2}] := Plus[
 	shannonEntropy[marginalProbabilityDistribution[probs, sizes, 1]],
 	shannonEntropy[marginalProbabilityDistribution[probs, sizes, 2]],
-	- shannonEntropy @ probs
+	- shannonEntropy @ Flatten @ probs
 ];
 conditionalEntropyXcY[probs_List, sizes : {sizeX_Integer, sizeY_Integer} : {2, 2}] := Total @ With[
 	{probsMat = ArrayReshape[probs, sizes]},
